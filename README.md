@@ -1,6 +1,6 @@
 # Undercut 🏎️
 
-Machine-learning predictions for every Formula 1 race, on a 3D spatial-UI website: a stepped intro stage with a rendered Red Bull car, race predictions with a 3D podium, live standings, team stats and a 3D garage.
+Machine-learning predictions for every Formula 1 race, on a 3D spatial-UI website: a cursor-reactive grid intro, race predictions with a 3D podium, live standings, team stats and a 3D garage.
 
 The model ranks the whole grid and gives each driver a win and podium probability. It was back-tested race by race on 2024–2026 against the simplest baseline: drivers finish in grid order.
 
@@ -27,7 +27,7 @@ site/              the website, deployed by Vercel
   css/styles.css   spatial UI styling (glass windows, depth, motion)
   js/app.js        page logic: data, race picker, standings, charts, animations
   js/car.js        3D car generator and liveries (Red Bull fully painted)
-  js/hero.js       intro scene: stepped valley with light trails
+  js/grid.js       intro background: cursor-reactive cell grid
   js/viewer.js     3D stage used for the podium and the garage
   models/          optional real .glb car models (see models/README.md)
   data.json        predictions, standings and stats written by export_site.py
