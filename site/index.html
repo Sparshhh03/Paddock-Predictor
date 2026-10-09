@@ -959,17 +959,17 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncTheme)
 new MutationObserver(syncTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
 // ---------- react to race changes ----------
-function tweenColor(mat, hex) {
+function tweenColor(mat, hex, instant) {
   const to = new THREE.Color(hex);
-  if (!G) { mat.color.copy(to); return; }
+  if (!G || instant) { mat.color.copy(to); return; }
   G.to(mat.color, { r: to.r, g: to.g, b: to.b, duration: 0.8, ease: 'power2.inOut' });
 }
 let spin = 0;
-function applyRace(d) {
+function applyRace(d, instant = false) {
   if (!d) return;
-  tweenColor(body, d.color);
-  d.podium.forEach((p, i) => helmets[i] && tweenColor(helmets[i].userData.shell.material, p.color));
-  if (G) {
+  tweenColor(body, d.color, instant);
+  d.podium.forEach((p, i) => helmets[i] && tweenColor(helmets[i].userData.shell.material, p.color, instant));
+  if (G && !instant) {
     spin += Math.PI * 2;
     G.to(car.rotation, { y: -0.35 + spin, duration: 1.4, ease: 'power3.inOut' });
     G.fromTo(car.position, { y: 0 }, { y: 0.5, duration: 0.35, yoyo: true, repeat: 1, ease: 'power2.out' });
@@ -977,7 +977,7 @@ function applyRace(d) {
   }
 }
 window.addEventListener('f1:race', e => applyRace(e.detail));
-applyRace(window.__f1race);
+applyRace(window.__f1race, true);
 
 // ---------- size + loop ----------
 function resize() {
