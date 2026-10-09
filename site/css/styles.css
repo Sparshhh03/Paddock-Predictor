@@ -38,7 +38,12 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 img { max-width: 100%; }
-html { scroll-behavior: smooth; background: var(--env); }
+html { background: var(--env); }
+/* Lenis smooth scrolling (from lenis/dist/lenis.css) */
+html.lenis, html.lenis body { height: auto; }
+.lenis:not(.lenis-autoToggle).lenis-stopped { overflow: clip; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-smooth iframe { pointer-events: none; }
 body {
   margin: 0;
   background:

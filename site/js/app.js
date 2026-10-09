@@ -6,6 +6,18 @@ const G = window.gsap && !RM ? window.gsap : null;
 if (window.gsap) gsap.ticker.lagSmoothing(0); // keep animations on real time
 if (G && window.ScrollTrigger) G.registerPlugin(ScrollTrigger);
 
+// Smooth scrolling with Lenis, driven by GSAP's clock so scroll animations stay in sync.
+// Skipped for visitors who ask for reduced motion.
+let lenis = null;
+if (window.Lenis && !RM) {
+  lenis = new Lenis({ lerp: 0.1, anchors: { offset: -80 }, autoRaf: !window.gsap });
+  if (window.gsap) {
+    lenis.on('scroll', () => window.ScrollTrigger?.update());
+    gsap.ticker.add(t => lenis.raf(t * 1000));
+  }
+}
+const scrollToEl = (el) => lenis ? lenis.scrollTo(el, { offset: -80 }) : el.scrollIntoView({ behavior: RM ? 'auto' : 'smooth' });
+
 const TEAMS = {
   mercedes: ['Mercedes', '#19C3AC'], ferrari: ['Ferrari', '#E8002D'], mclaren: ['McLaren', '#FF8000'],
   red_bull: ['Red Bull Racing', '#3B5BDB'], rb: ['Racing Bulls', '#6692FF'], alpine: ['Alpine', '#F282B4'],
@@ -316,7 +328,7 @@ function renderSeason() {
   $('#rounds').addEventListener('click', e => {
     const b = e.target.closest('button.rtile'); if (!b) return;
     selectRace(+b.dataset.round);
-    document.getElementById('race').scrollIntoView({ behavior: RM ? 'auto' : 'smooth' });
+    scrollToEl(document.getElementById('race'));
   });
 }
 
