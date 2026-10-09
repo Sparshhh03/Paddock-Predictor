@@ -111,6 +111,34 @@ def load_qualifying(seasons, refresh_current=True):
     return pd.DataFrame(rows)
 
 
+def load_standings(season):
+    """Current driver and constructor championship tables (points include sprints)."""
+    def table(endpoint, key):
+        lists = _get(f"{API}/{season}/{endpoint}.json")["StandingsTable"]["StandingsLists"]
+        return lists[0][key] if lists else []
+
+    drivers = [{
+        "pos": int(s["position"]) if s.get("position") else None,
+        "points": float(s["points"]),
+        "wins": int(s["wins"]),
+        "driver": s["Driver"]["driverId"],
+        "code": s["Driver"].get("code", s["Driver"]["familyName"][:3].upper()),
+        "name": f'{s["Driver"]["givenName"]} {s["Driver"]["familyName"]}',
+        "number": s["Driver"].get("permanentNumber"),
+        "nationality": s["Driver"].get("nationality"),
+        "team": s["Constructors"][-1]["constructorId"] if s["Constructors"] else None,
+    } for s in table("driverstandings", "DriverStandings")]
+    constructors = [{
+        "pos": int(s["position"]) if s.get("position") else None,
+        "points": float(s["points"]),
+        "wins": int(s["wins"]),
+        "team": s["Constructor"]["constructorId"],
+        "name": s["Constructor"]["name"],
+        "nationality": s["Constructor"].get("nationality"),
+    } for s in table("constructorstandings", "ConstructorStandings")]
+    return drivers, constructors
+
+
 def load_schedule(season):
     data = _get(f"{API}/{season}.json", {"limit": 100})
     return pd.DataFrame([{

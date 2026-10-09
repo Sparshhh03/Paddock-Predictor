@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from f1 import CURRENT_SEASON, backtest, load_all, next_round, predict_race
-from f1predict.data import load_schedule
+from f1predict.data import load_schedule, load_standings
 from f1predict.model import race_metrics
 
 OUT = Path(__file__).resolve().parent / "site" / "data.json"
@@ -50,6 +50,40 @@ def race_rows(pred, actual=None):
 
 def metrics_dict(m):
     return {k: r3(v) for k, v in m.items()}
+
+
+def standings_block(results, quali, season):
+    """Championship tables plus each driver's and team's Grand Prix record this season."""
+    drivers, constructors = load_standings(season)
+    res = results[results["season"] == season]
+    q = quali[quali["season"] == season]
+    names = res.drop_duplicates("round").set_index("round")["race_name"]
+    poles_by_driver = q[q["quali_pos"] == 1].groupby("driver").size()
+    poles_by_team = q[q["quali_pos"] == 1].groupby("constructor").size()
+
+    for d in drivers:
+        r = res[res["driver"] == d["driver"]].sort_values("round")
+        d["finishes"] = [{"round": int(x["round"]), "pos": int(x["position"]), "grid": int(x["grid"]),
+                          "dnf": not bool(x["finished"]), "status": x["status"], "points": float(x["points"])}
+                         for _, x in r.iterrows()]
+        d["starts"] = len(r)
+        d["podiums"] = int((r["position"] <= 3).sum())
+        d["poles"] = int(poles_by_driver.get(d["driver"], 0))
+        d["dnfs"] = int((~r["finished"].astype(bool)).sum())
+        d["best"] = int(r["position"].min()) if len(r) else None
+
+    for c in constructors:
+        r = res[res["constructor"] == c["team"]]
+        fin = r[r["finished"].astype(bool)]
+        c["podiums"] = int((r["position"] <= 3).sum())
+        c["poles"] = int(poles_by_team.get(c["team"], 0))
+        c["dnfs"] = int((~r["finished"].astype(bool)).sum())
+        c["avg_finish"] = r3(fin["position"].mean()) if len(fin) else None
+        c["best"] = int(r["position"].min()) if len(r) else None
+        c["drivers"] = [d["driver"] for d in drivers if d["team"] == c["team"]]
+
+    return {"rounds": [{"round": int(k), "name": v} for k, v in names.items()],
+            "drivers": drivers, "constructors": constructors}
 
 
 def main():
@@ -116,6 +150,7 @@ def main():
         "races": races,
         "calendar": calendar,
         "season_track": track,
+        "standings": standings_block(results, quali, CURRENT_SEASON),
         "backtest": {"seasons": seasons, "calibration": calibration, "importance": importance},
     }
     OUT.parent.mkdir(exist_ok=True)
