@@ -1,5 +1,5 @@
 /* Undercut: spatial UI.
-   Layout: a full-bleed 3D intro stage, then floating glass "windows" over a dark environment,
+   Layout: a full-bleed intro on a cursor-reactive cell grid, then floating glass "windows" over a dark environment,
    each section a window with its own ornaments (floating toolbars) below or beside it.
    Single dark look by design: the environment is the stage the windows float in. */
 :root {
@@ -134,13 +134,23 @@ button, select { font: inherit; color: inherit; }
 .nav a.link:hover, .nav a.link.on { color: var(--ink); background: rgba(255, 255, 255, .1); }
 @media (max-width: 760px) { .nav a.link { display: none; } .nav a.link.keep { display: inline-flex; } }
 
-/* ---------- intro stage ---------- */
-.intro { position: relative; height: clamp(640px, 100svh, 980px); overflow: hidden; }
-.intro canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* ---------- intro ---------- */
+.intro { --cell: 14px; position: relative; height: clamp(600px, 92svh, 880px); overflow: hidden; display: grid; align-content: center; }
+/* fine grid: lines in CSS, lit cells painted on the canvas at the same 14px pitch */
+.grid-bg {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .045) 1px, transparent 1px);
+  background-size: var(--cell) var(--cell);
+  -webkit-mask-image: radial-gradient(ellipse 75% 70% at 50% 42%, #000 35%, transparent 100%);
+  mask-image: radial-gradient(ellipse 75% 70% at 50% 42%, #000 35%, transparent 100%);
+}
+.grid-bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .intro::after { content: ""; position: absolute; inset: auto 0 0; height: 30%; background: linear-gradient(transparent, var(--env)); pointer-events: none; }
 .intro-copy {
   position: relative; z-index: 2; text-align: center;
-  padding: calc(env(safe-area-inset-top, 0px) + clamp(110px, 16vh, 150px)) var(--gutter) 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 40px) var(--gutter) 60px;
   display: grid; justify-items: center; gap: 18px;
 }
 .intro h1 { font-size: clamp(2.3rem, 6.4vw, 5rem); font-weight: 600; max-width: 15ch; }
@@ -153,9 +163,6 @@ button, select { font: inherit; color: inherit; }
 .intro .hint i { width: 22px; height: 34px; border: 2px solid var(--ink-3); border-radius: 12px; position: relative; }
 .intro .hint i::after { content: ""; position: absolute; left: 50%; top: 6px; width: 4px; height: 7px; margin-left: -2px; border-radius: 2px; background: var(--ink-2); animation: wheel 1.8s infinite; }
 @keyframes wheel { 0% { transform: translateY(0); opacity: 1; } 70% { transform: translateY(10px); opacity: 0; } 100% { opacity: 0; } }
-.car-tag { position: absolute; z-index: 2; right: var(--gutter); bottom: 200px; padding: 10px 14px; border-radius: 16px; display: grid; gap: 2px; font-size: .8rem; }
-.car-tag b { font-family: var(--f-display); font-size: .95rem; }
-@media (max-width: 760px) { .car-tag { display: none; } }
 
 /* ---------- page shell ---------- */
 main { position: relative; z-index: 3; max-width: 1280px; margin: 0 auto; padding: 0 var(--gutter) 40px; display: grid; gap: clamp(72px, 10vw, 130px); }

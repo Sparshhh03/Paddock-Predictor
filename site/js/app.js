@@ -1,5 +1,6 @@
 // Undercut: page logic. Loads data.json, renders every section, and boots the 3D scenes.
 // The 3D modules are imported lazily, so the page still works if WebGL or the CDN fails.
+import { createGrid } from './grid.js';
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const G = window.gsap && !RM ? window.gsap : null;
 if (window.gsap) gsap.ticker.lagSmoothing(0); // keep animations on real time
@@ -392,8 +393,7 @@ function motion() {
   const tl = G.timeline({ defaults: { ease: 'power3.out' } });
   tl.from('.nav', { y: -60, duration: 0.7 })
     .from('.intro-copy > *', { y: 26, duration: 0.7, stagger: 0.08 }, '-=.4')
-    .from('.feat', { y: 50, rotateX: 12, duration: 0.9, stagger: 0.06, ease: 'back.out(1.4)' }, '-=.5')
-    .from('.car-tag', { x: 40, duration: 0.7 }, '<');
+    .from('.feat', { y: 50, rotateX: 12, duration: 0.9, stagger: 0.06, ease: 'back.out(1.4)' }, '-=.5');
   introTweens.push(tl);
   setTimeout(() => introTweens.forEach(t => t.progress(1)), 3200);
 
@@ -417,11 +417,7 @@ function motion() {
 async function boot3D() {
   const fail = (sel, msg) => { const st = $(sel); st.querySelector('canvas')?.remove(); st.insertAdjacentHTML('afterbegin', `<div class="stage-fallback">${msg}</div>`); };
   try {
-    const [{ createHero }, { createViewer }] = await Promise.all([import('./hero.js'), import('./viewer.js')]);
-    const hero = await createHero($('#hero-canvas'), { reducedMotion: RM, gsap: G });
-    if (G && window.ScrollTrigger) {
-      ScrollTrigger.create({ trigger: '.intro', start: 'top top', end: 'bottom top', scrub: true, onUpdate: s => hero.setProgress(s.progress) });
-    }
+    const { createViewer } = await import('./viewer.js');
     raceViewer = await createViewer($('#race-canvas'), { podium: true, reducedMotion: RM, gsap: G });
     garageViewer = await createViewer($('#garage-canvas'), { podium: false, reducedMotion: RM, gsap: G });
     if (current) {
@@ -433,13 +429,13 @@ async function boot3D() {
     garageViewer.setCar(selectedTeam, { number: c?.number || '', teamName: team(selectedTeam)[0] });
   } catch (e) {
     console.warn('3D unavailable', e);
-    $('#hero-canvas')?.remove();
     fail('#race-stage', '3D view needs WebGL, which this browser has turned off.');
     fail('#garage-stage', '3D view needs WebGL, which this browser has turned off.');
   }
 }
 
 // ---------- boot ----------
+createGrid($('.intro'), $('#grid-canvas'), { reducedMotion: RM });
 typeTitle();
 fetch('data.json').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(d => {
   DATA = d;
