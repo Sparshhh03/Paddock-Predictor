@@ -1,0 +1,1011 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Paddock Predictor</title>
+<meta name="description" content="Machine-learning predictions for every Formula 1 race, with win and podium odds and a public accuracy record.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Paddock Predictor">
+<meta property="og:description" content="Who wins the next Grand Prix? ML race predictions with win and podium odds, in 3D.">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#1C1718">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath d='M3 15a10 10 0 0 1 20-2v4H11a3 3 0 0 0-3 3H5a2 2 0 0 1-2-2z' fill='%23D7261E'/%3E%3Cpath d='M13 9h9.4a10 10 0 0 1 .6 4H13z' fill='%232A1F22'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: a clay paddock. Hero = race card + 3D turntable stage; then timing tower, season strip, accuracy lab, method. */
+:root {
+  --bg: #EAE3E0;
+  --surface: #F4EEEB;
+  --surface-2: #E9E0DC;
+  --ink: #2A1F22;
+  --muted: #6B5C60;
+  --accent: #D7261E;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #F7D5CF;
+  --series-a: #D7261E;
+  --series-b: #3F7CB8;
+  --good: #1D7F47;
+  --good-soft: #D3EEDD;
+  --warn: #9A6212;
+  --warn-soft: #F6E4C5;
+  --bad: #B3261E;
+  --bad-soft: #F7D5CF;
+  --line: rgba(42, 31, 34, .11);
+  --sh-dark: rgba(125, 84, 78, .30);
+  --sh-light: rgba(255, 255, 255, .95);
+  --in-light: rgba(255, 255, 255, .80);
+  --in-dark: rgba(125, 84, 78, .17);
+  --tt: #DDD3CF;
+  --kerb-w: #FFFFFF;
+
+  --f-display: "Unbounded", "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif;
+  --f-body: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-data: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  --r-lg: 30px;
+  --r-md: 22px;
+  --r-sm: 14px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1C1718; --surface: #2B2527; --surface-2: #241F21; --ink: #F4ECE9; --muted: #B4A6A9;
+    --accent: #EE4A3E; --accent-ink: #FFFFFF; --accent-soft: #4B2522;
+    --series-a: #EE4A3E; --series-b: #5A93CC;
+    --good: #5BCB8B; --good-soft: #1F3A2A; --warn: #E7AE55; --warn-soft: #3D3020; --bad: #F2766B; --bad-soft: #472421;
+    --line: rgba(244, 236, 233, .10);
+    --sh-dark: rgba(0, 0, 0, .55); --sh-light: rgba(255, 255, 255, .045);
+    --in-light: rgba(255, 255, 255, .08); --in-dark: rgba(0, 0, 0, .38);
+    --tt: #3A3234; --kerb-w: #E9E1DE;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1C1718; --surface: #2B2527; --surface-2: #241F21; --ink: #F4ECE9; --muted: #B4A6A9;
+  --accent: #EE4A3E; --accent-ink: #FFFFFF; --accent-soft: #4B2522;
+  --series-a: #EE4A3E; --series-b: #5A93CC;
+  --good: #5BCB8B; --good-soft: #1F3A2A; --warn: #E7AE55; --warn-soft: #3D3020; --bad: #F2766B; --bad-soft: #472421;
+  --line: rgba(244, 236, 233, .10);
+  --sh-dark: rgba(0, 0, 0, .55); --sh-light: rgba(255, 255, 255, .045);
+  --in-light: rgba(255, 255, 255, .08); --in-dark: rgba(0, 0, 0, .38);
+  --tt: #3A3234; --kerb-w: #E9E1DE;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.55;
+  padding-inline: clamp(16px, 4vw, 48px);
+  padding-block: 0 56px;
+  overflow-x: hidden;
+}
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.12; }
+h2 { font-size: clamp(1.45rem, 3vw, 2.1rem); font-weight: 700; letter-spacing: -.01em; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; }
+button, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 10px; }
+.num { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+.eyebrow { font-family: var(--f-data); font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.muted { color: var(--muted); }
+
+/* ---------- clay primitives ---------- */
+.clay {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow:
+    14px 16px 32px var(--sh-dark),
+    -10px -10px 24px var(--sh-light),
+    inset 4px 4px 8px var(--in-light),
+    inset -6px -7px 12px var(--in-dark);
+}
+.clay-sm {
+  background: var(--surface);
+  border-radius: var(--r-sm);
+  box-shadow:
+    6px 7px 14px var(--sh-dark),
+    -5px -5px 12px var(--sh-light),
+    inset 2px 2px 4px var(--in-light),
+    inset -3px -3px 6px var(--in-dark);
+}
+.clay-btn {
+  border: 0; cursor: pointer;
+  background: var(--surface);
+  border-radius: 999px;
+  padding: .6rem 1.05rem;
+  font-weight: 800;
+  box-shadow: 6px 7px 14px var(--sh-dark), -5px -5px 12px var(--sh-light), inset 2px 2px 4px var(--in-light), inset -3px -3px 6px var(--in-dark);
+  transition: transform .18s cubic-bezier(.3,1.6,.5,1), box-shadow .18s ease;
+}
+.clay-btn:hover { transform: translateY(-2px); }
+.clay-btn:active { transform: translateY(1px) scale(.96); box-shadow: 2px 2px 6px var(--sh-dark), -2px -2px 6px var(--sh-light), inset 4px 4px 8px var(--in-dark), inset -2px -2px 4px var(--in-light); }
+.clay-btn[aria-pressed="true"], .clay-btn.is-on { background: var(--accent); color: var(--accent-ink); }
+.clay-btn:disabled { opacity: .45; cursor: default; transform: none; }
+.inset {
+  background: var(--surface-2);
+  border-radius: 999px;
+  box-shadow: inset 4px 4px 8px var(--in-dark), inset -3px -3px 6px var(--in-light);
+}
+
+/* ---------- top bar ---------- */
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  margin-inline: calc(-1 * clamp(16px, 4vw, 48px));
+  padding: 12px clamp(16px, 4vw, 48px);
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+}
+.topbar::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 6px;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 26px, var(--kerb-w) 26px 52px);
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); margin-top: 4px; }
+.brand-mark { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 14px; }
+.brand-name { font-family: var(--f-display); font-weight: 800; font-size: 1.05rem; letter-spacing: -.01em; }
+.brand-name span { color: var(--accent); }
+.nav { display: flex; gap: 6px; margin-left: auto; margin-top: 4px; flex-wrap: wrap; }
+.nav a { text-decoration: none; color: var(--muted); font-weight: 800; font-size: .9rem; padding: .45rem .8rem; border-radius: 999px; transition: color .2s, background .2s; }
+.nav a:hover { color: var(--ink); background: var(--surface); }
+@media (max-width: 640px) { .nav { display: none; } }
+
+main { max-width: 1240px; margin: 0 auto; display: grid; gap: clamp(56px, 8vw, 96px); padding-top: 26px; }
+section { scroll-margin-top: 90px; }
+.sec-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
+.sec-head p { max-width: 60ch; margin-top: 8px; color: var(--muted); }
+
+/* ---------- hero ---------- */
+.hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 28px; align-items: stretch; }
+@media (max-width: 920px) { .hero { grid-template-columns: 1fr; } }
+.race-card { padding: clamp(22px, 3vw, 34px); display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.race-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: .3rem .75rem; border-radius: 999px; font-weight: 800; font-size: .78rem; letter-spacing: .04em; }
+.pill-live { background: var(--accent); color: var(--accent-ink); }
+.pill-live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: blink 1.4s infinite; }
+.pill-done { background: var(--surface-2); color: var(--muted); box-shadow: inset 2px 2px 5px var(--in-dark), inset -2px -2px 4px var(--in-light); }
+@keyframes blink { 50% { opacity: .25; } }
+.race-name { font-size: clamp(1.9rem, 4.2vw, 3rem); font-weight: 800; letter-spacing: -.02em; }
+.race-meta { display: grid; gap: 4px; color: var(--muted); font-weight: 600; }
+.countdown { display: flex; gap: 10px; }
+.cd-cell { padding: 10px 0 8px; width: 68px; text-align: center; }
+.cd-cell b { display: block; font-family: var(--f-data); font-size: 1.45rem; line-height: 1; }
+.cd-cell span { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+.picker { display: flex; gap: 10px; align-items: center; }
+.select-wrap { position: relative; flex: 1; min-width: 0; }
+.select-wrap select {
+  appearance: none; -webkit-appearance: none; width: 100%; border: 0; cursor: pointer;
+  padding: .75rem 2.6rem .75rem 1.1rem; font-weight: 800; text-overflow: ellipsis;
+}
+.select-wrap::after { content: ""; position: absolute; right: 18px; top: 50%; width: 9px; height: 9px; border-right: 3px solid var(--muted); border-bottom: 3px solid var(--muted); transform: translateY(-70%) rotate(45deg); pointer-events: none; border-radius: 2px; }
+.icon-btn { width: 46px; height: 46px; padding: 0; display: grid; place-items: center; flex: none; }
+
+.winner { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; padding: 18px 20px; border-radius: var(--r-md); }
+.ring { width: 104px; height: 104px; position: relative; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .track { stroke: var(--surface-2); }
+.ring .val { stroke: var(--accent); stroke-linecap: round; }
+.ring-label { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; line-height: 1.05; }
+.ring-label b { font-family: var(--f-data); font-size: 1.35rem; }
+.ring-label small { display: block; font-size: .62rem; letter-spacing: .1em; color: var(--muted); font-weight: 800; text-transform: uppercase; }
+.winner-code { font-family: var(--f-display); font-weight: 800; font-size: clamp(2.2rem, 5vw, 3rem); line-height: 1; letter-spacing: -.02em; display: flex; align-items: center; gap: 10px; }
+.winner-name { font-weight: 800; }
+.winner-note { font-size: .9rem; color: var(--muted); margin-top: 4px; }
+.verdict { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: .25rem .65rem; border-radius: 999px; font-weight: 800; font-size: .8rem; }
+.v-good { background: var(--good-soft); color: var(--good); }
+.v-warn { background: var(--warn-soft); color: var(--warn); }
+.v-bad { background: var(--bad-soft); color: var(--bad); }
+.src-note { font-size: .85rem; color: var(--muted); display: flex; gap: 8px; align-items: flex-start; }
+
+.stage { position: relative; min-height: 460px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: pan-y; }
+.stage canvas:active { cursor: grabbing; }
+.stage-top { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: start; padding: 20px 22px 0; pointer-events: none; gap: 10px; }
+.stage-hint { font-size: .8rem; font-weight: 800; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.podium-labels { position: relative; z-index: 2; margin-top: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 0 18px 18px; pointer-events: none; }
+.pl { padding: 10px 12px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pl .p { font-family: var(--f-display); font-weight: 800; font-size: 1.1rem; color: var(--accent); }
+.pl .c { font-family: var(--f-data); font-weight: 700; }
+.pl .w { font-size: .75rem; color: var(--muted); font-weight: 700; }
+.pl > div { min-width: 0; }
+.stage-fallback { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-weight: 700; padding: 24px; text-align: center; }
+@media (max-width: 560px) { .stage { min-height: 380px; } .pl { padding: 8px; gap: 6px; } .pl .w { display: none; } }
+
+.team-dot { width: 14px; height: 14px; border-radius: 50%; flex: none; background: var(--tc, #999); box-shadow: 0 0 0 3px var(--surface), inset -2px -2px 3px rgba(0,0,0,.25), inset 2px 2px 3px rgba(255,255,255,.45); }
+
+/* ---------- timing tower ---------- */
+.tower-wrap { padding: clamp(14px, 2vw, 22px); }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: .85rem; color: var(--muted); font-weight: 700; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.sw { width: 14px; height: 14px; border-radius: 5px; }
+.tower { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.trow, .thead {
+  display: grid; align-items: center; gap: 14px;
+  grid-template-columns: 52px minmax(150px, 1.4fr) 110px minmax(90px, 1fr) minmax(90px, 1fr) 104px;
+}
+.thead { padding: 0 16px 6px; font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; font-weight: 800; color: var(--muted); }
+.trow { padding: 10px 16px; border-radius: 18px; background: var(--surface); box-shadow: 5px 6px 12px var(--sh-dark), -4px -4px 10px var(--sh-light), inset 2px 2px 4px var(--in-light), inset -3px -3px 5px var(--in-dark); transition: transform .2s cubic-bezier(.3,1.5,.5,1); }
+.trow:hover { transform: translateX(6px); }
+.trow.top3 .pos { background: var(--accent); color: var(--accent-ink); }
+.pos { width: 44px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-family: var(--f-display); font-weight: 800; font-size: .95rem; background: var(--surface-2); box-shadow: inset 2px 2px 5px var(--in-dark), inset -2px -2px 4px var(--in-light); }
+.who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.who-txt { min-width: 0; }
+.who b { font-family: var(--f-data); font-size: 1.02rem; margin-right: 6px; }
+.who .nm { font-weight: 700; }
+.who .tm { display: block; font-size: .8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gridcell { font-size: .88rem; font-weight: 700; }
+.gridcell .mv { display: block; font-size: .76rem; font-weight: 800; }
+.mv.up { color: var(--good); } .mv.down { color: var(--bad); } .mv.same { color: var(--muted); }
+.bar { height: 18px; position: relative; }
+.bar i { position: absolute; left: 3px; top: 3px; bottom: 3px; border-radius: 999px; background: var(--accent); width: var(--w); min-width: 6px; transform-origin: left center; box-shadow: inset -2px -2px 3px rgba(0,0,0,.18), inset 2px 2px 3px rgba(255,255,255,.35); }
+.bar.pod i { background: var(--series-b); }
+.barcell { display: grid; gap: 3px; }
+.barcell small { font-family: var(--f-data); font-size: .8rem; font-weight: 700; }
+.act { justify-self: end; padding: .3rem .6rem; border-radius: 999px; font-weight: 800; font-size: .8rem; font-family: var(--f-data); white-space: nowrap; }
+.act-na { color: var(--muted); font-family: var(--f-body); font-size: .78rem; }
+.mlabel { display: none; }
+@media (max-width: 860px) {
+  .thead { display: none; }
+  .trow { grid-template-columns: 46px minmax(0, 1fr) auto; grid-template-areas: "pos who act" "pos grid grid" "w w w" "p p p"; row-gap: 8px; }
+  .trow .pos { grid-area: pos; align-self: start; }
+  .trow .who { grid-area: who; }
+  .trow .act { grid-area: act; }
+  .trow .gridcell { grid-area: grid; display: flex; gap: 10px; }
+  .trow .gridcell .mv { display: inline; }
+  .trow .bc-w { grid-area: w; } .trow .bc-p { grid-area: p; }
+  .mlabel { display: inline; color: var(--muted); font-family: var(--f-body); margin-right: 6px; }
+}
+
+/* ---------- season ---------- */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 22px; margin-bottom: 30px; }
+.stat { padding: 22px 24px; display: grid; gap: 6px; }
+.stat .big { font-family: var(--f-display); font-weight: 800; font-size: 2.3rem; line-height: 1; letter-spacing: -.02em; }
+.stat .big small { font-size: 1rem; color: var(--muted); font-weight: 700; }
+.stat .vs { font-size: .9rem; color: var(--muted); font-weight: 700; }
+.rounds { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+.rtile { text-align: left; border: 0; cursor: pointer; padding: 14px 16px; display: grid; gap: 8px; border-radius: 20px; transition: transform .2s cubic-bezier(.3,1.5,.5,1); }
+.rtile:hover { transform: translateY(-4px) rotate(-.6deg); }
+.rtile.sel { outline: 3px solid var(--accent); outline-offset: 2px; }
+.rtile .rt-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.rtile .rn { font-family: var(--f-data); font-size: .75rem; font-weight: 700; color: var(--muted); }
+.rtile .rname { font-weight: 800; line-height: 1.2; font-size: .95rem; }
+.rtile .rwin { display: flex; align-items: center; gap: 8px; font-family: var(--f-data); font-weight: 700; font-size: .9rem; }
+.dots { display: flex; gap: 5px; align-items: center; font-size: .75rem; color: var(--muted); font-weight: 700; }
+.dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--surface-2); box-shadow: inset 1px 1px 3px var(--in-dark); }
+.dots i.on { background: var(--series-b); box-shadow: inset -1px -1px 2px rgba(0,0,0,.2); }
+.rtile.next { background: var(--accent); color: var(--accent-ink); }
+.rtile.next .rn, .rtile.next .muted { color: inherit; opacity: .85; }
+.rtile.future { opacity: .55; cursor: default; }
+.rtile.future:hover { transform: none; }
+
+/* ---------- accuracy ---------- */
+.lab { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 26px; }
+@media (max-width: 960px) { .lab { grid-template-columns: 1fr; } }
+.panel { padding: clamp(18px, 2.4vw, 28px); display: grid; gap: 16px; align-content: start; min-width: 0; }
+.panel p.cap { color: var(--muted); font-size: .92rem; }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tabs .clay-btn { padding: .45rem .9rem; font-size: .85rem; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { fill: var(--muted); font-family: var(--f-body); font-size: 12px; font-weight: 700; }
+.chart .val-label { fill: var(--ink); font-family: var(--f-data); font-size: 12px; }
+.chart .gridl { stroke: var(--line); stroke-width: 1; }
+.chart .axis { stroke: var(--muted); stroke-width: 1.5; }
+.imp { display: grid; gap: 10px; }
+.imp-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 46px; gap: 12px; align-items: center; font-size: .9rem; font-weight: 700; }
+.imp-row .bar i { background: var(--accent); }
+.imp-row .v { font-family: var(--f-data); text-align: right; }
+.tbl-toggle { justify-self: start; font-size: .82rem; padding: .4rem .8rem; }
+.tbl { overflow-x: auto; }
+.tbl table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+.tbl th, .tbl td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tbl th:first-child, .tbl td:first-child { text-align: left; }
+.tbl td { font-family: var(--f-data); }
+
+/* ---------- method ---------- */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 22px; }
+.step { padding: 24px; display: grid; gap: 10px; align-content: start; }
+.step .n { width: 46px; height: 46px; border-radius: 16px; display: grid; place-items: center; font-family: var(--f-display); font-weight: 800; background: var(--accent); color: var(--accent-ink); box-shadow: 4px 5px 10px var(--sh-dark), inset -3px -3px 6px rgba(0,0,0,.2), inset 3px 3px 6px rgba(255,255,255,.3); }
+.step p { color: var(--muted); font-size: .95rem; }
+.fine { margin-top: 26px; padding: 20px 24px; color: var(--muted); font-size: .92rem; display: grid; gap: 6px; }
+
+footer { max-width: 1240px; margin: 70px auto 0; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: .85rem; font-weight: 600; }
+footer a { color: inherit; }
+
+#tip { position: fixed; z-index: 50; pointer-events: none; padding: 8px 12px; border-radius: 12px; font-size: .82rem; font-weight: 700; background: var(--ink); color: var(--bg); max-width: 240px; opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s; }
+#tip.show { opacity: 1; transform: none; }
+
+.loading { padding: 40px; text-align: center; color: var(--muted); font-weight: 700; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+</style>
+
+<header class="topbar">
+  <a class="brand" href="#race" aria-label="Paddock Predictor home">
+    <span class="brand-mark clay-sm" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 26 26"><path d="M3 15a10 10 0 0 1 20-2v4H11a3 3 0 0 0-3 3H5a2 2 0 0 1-2-2z" fill="var(--accent)"/><path d="M13 9h9.4a10 10 0 0 1 .6 4H13z" fill="var(--ink)" opacity=".85"/></svg>
+    </span>
+    <span class="brand-name">Paddock<span>Predictor</span></span>
+  </a>
+  <nav class="nav" aria-label="Sections">
+    <a href="#race">Race</a><a href="#order">Order</a><a href="#season">Season</a><a href="#accuracy">Accuracy</a><a href="#method">How it works</a>
+  </nav>
+</header>
+
+<main id="app">
+  <section id="race" class="hero" aria-label="Race prediction">
+    <div class="race-card clay">
+      <div class="race-top">
+        <span id="status-pill" class="pill pill-live">Next race</span>
+        <span id="race-round" class="eyebrow">Round</span>
+      </div>
+      <div>
+        <h1 id="race-name" class="race-name">Loading race…</h1>
+        <div class="race-meta" style="margin-top:10px">
+          <span id="race-circuit"></span>
+          <span id="race-when"></span>
+        </div>
+      </div>
+      <div id="countdown" class="countdown" aria-label="Time until lights out">
+        <div class="cd-cell clay-sm"><b id="cd-d">--</b><span>Days</span></div>
+        <div class="cd-cell clay-sm"><b id="cd-h">--</b><span>Hrs</span></div>
+        <div class="cd-cell clay-sm"><b id="cd-m">--</b><span>Min</span></div>
+        <div class="cd-cell clay-sm"><b id="cd-s">--</b><span>Sec</span></div>
+      </div>
+      <div class="picker">
+        <button id="prev" class="clay-btn icon-btn" aria-label="Previous race"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="select-wrap"><label for="race-select" class="eyebrow" style="position:absolute;left:-9999px">Choose a race</label><select id="race-select" class="clay-btn"></select></div>
+        <button id="next" class="clay-btn icon-btn" aria-label="Next race"><svg width="16" height="16" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+      <div class="winner clay-sm">
+        <div class="ring">
+          <svg viewBox="0 0 100 100" aria-hidden="true"><circle class="track" cx="50" cy="50" r="42" fill="none" stroke-width="11"/><circle id="ring-val" class="val" cx="50" cy="50" r="42" fill="none" stroke-width="11" stroke-dasharray="263.9" stroke-dashoffset="263.9"/></svg>
+          <div class="ring-label"><div><b id="ring-num">0%</b><small>to win</small></div></div>
+        </div>
+        <div style="min-width:0">
+          <div class="eyebrow">Predicted winner</div>
+          <div id="w-code" class="winner-code">---</div>
+          <div id="w-name" class="winner-name"></div>
+          <div id="w-note" class="winner-note"></div>
+          <div id="w-verdict"></div>
+        </div>
+      </div>
+      <p id="src-note" class="src-note"></p>
+    </div>
+
+    <div class="stage clay" id="stage">
+      <canvas id="scene" aria-label="3D clay model of a Formula 1 car and the predicted podium. Drag to rotate."></canvas>
+      <div class="stage-top">
+        <span class="eyebrow">Predicted podium</span>
+        <span class="stage-hint"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8a6 6 0 0 1 11-3.3M14 8a6 6 0 0 1-11 3.3M13 1.5v3.4H9.6M3 14.5v-3.4h3.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Drag to spin</span>
+      </div>
+      <div class="podium-labels" id="podium-labels"></div>
+    </div>
+  </section>
+
+  <section id="order" aria-labelledby="order-h">
+    <div class="sec-head">
+      <div>
+        <h2 id="order-h">Predicted finishing order</h2>
+        <p id="order-sub">Every driver, ranked by the model, with their chance of winning and of finishing on the podium.</p>
+      </div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--accent)"></i>Win chance</span>
+        <span><i class="sw" style="background:var(--series-b)"></i>Podium chance</span>
+      </div>
+    </div>
+    <div class="tower-wrap clay">
+      <div class="thead" aria-hidden="true"><span>Pred</span><span>Driver</span><span>Grid</span><span>Win chance</span><span>Podium chance</span><span style="text-align:right">Result</span></div>
+      <ol id="tower" class="tower"><li class="loading">Loading predictions…</li></ol>
+    </div>
+  </section>
+
+  <section id="season" aria-labelledby="season-h">
+    <div class="sec-head">
+      <div>
+        <h2 id="season-h"><span id="season-year">2026</span> scorecard</h2>
+        <p>Each race was predicted using only data from before it. Compare against the simplest rule: the driver on pole wins.</p>
+      </div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="rounds" id="rounds"></div>
+  </section>
+
+  <section id="accuracy" aria-labelledby="acc-h">
+    <div class="sec-head">
+      <div>
+        <h2 id="acc-h">How accurate is it?</h2>
+        <p>Back-tested race by race over three seasons. The baseline predicts that drivers finish in their starting-grid order.</p>
+      </div>
+    </div>
+    <div class="lab">
+      <div class="panel clay">
+        <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center">
+          <h3>Model vs grid order</h3>
+          <div class="legend">
+            <span><i class="sw" style="background:var(--series-a)"></i>Model</span>
+            <span><i class="sw" style="background:var(--series-b)"></i>Grid order</span>
+          </div>
+        </div>
+        <div class="tabs" role="group" aria-label="Metric" id="metric-tabs"></div>
+        <p class="cap" id="metric-cap"></p>
+        <div class="chart" id="season-chart"></div>
+        <button class="clay-btn tbl-toggle" id="tbl-btn" aria-expanded="false">Show as table</button>
+        <div class="tbl" id="season-tbl" hidden></div>
+      </div>
+      <div style="display:grid;gap:26px;min-width:0">
+        <div class="panel clay">
+          <h3>Can you trust the percentages?</h3>
+          <p class="cap">Drivers grouped by predicted win chance. Dots near the dashed line mean the odds are honest.</p>
+          <div class="chart" id="calib"></div>
+        </div>
+        <div class="panel clay">
+          <h3>What drives the prediction</h3>
+          <p class="cap">Share of the ranking model's decisions explained by each input.</p>
+          <div class="imp" id="imp"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="method" aria-labelledby="method-h">
+    <div class="sec-head"><div><h2 id="method-h">How it works</h2><p>A four-stage pipeline that reruns after every qualifying session and race.</p></div></div>
+    <div class="steps">
+      <div class="step clay"><div class="n">1</div><h3>Collect</h3><p>Race and qualifying results for every Grand Prix since 2018, pulled from the Jolpica F1 database.</p></div>
+      <div class="step clay"><div class="n">2</div><h3>Engineer</h3><p>20 signals per driver: grid slot, gap to pole, recent form, team pace, retirement rate, track history and championship standing.</p></div>
+      <div class="step clay"><div class="n">3</div><h3>Train</h3><p>A LightGBM ranking model sets the order. Logistic models give win and podium odds. Recent seasons weigh more.</p></div>
+      <div class="step clay"><div class="n">4</div><h3>Test honestly</h3><p>Every past race is predicted using only earlier races, then scored against the grid-order baseline.</p></div>
+    </div>
+    <div class="fine clay-sm">
+      <strong style="color:var(--ink)">Read the odds, not just the order.</strong>
+      <span>Crashes, safety cars, rain and strategy make F1 noisy. A 30% favourite loses most of the time. Before qualifying, the grid is estimated from team pace, so predictions sharpen after Saturday.</span>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span id="updated">Data loading…</span>
+  <span>Results data: <a href="https://github.com/jolpica/jolpica-f1" target="_blank" rel="noopener">Jolpica F1</a>. Fan project, not affiliated with Formula 1.</span>
+</footer>
+<div id="tip" role="tooltip"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<!-- UI: data, timing tower, charts, GSAP motion -->
+<script>
+(() => {
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const G = window.gsap && !RM ? window.gsap : null;
+  if (G && window.ScrollTrigger) G.registerPlugin(ScrollTrigger);
+
+  const TEAMS = {
+    mercedes: ['Mercedes', '#19C3AC'], ferrari: ['Ferrari', '#E8002D'], mclaren: ['McLaren', '#FF8000'],
+    red_bull: ['Red Bull', '#3671C6'], rb: ['Racing Bulls', '#6692FF'], alpine: ['Alpine', '#F282B4'],
+    williams: ['Williams', '#64C4FF'], aston_martin: ['Aston Martin', '#229971'], haas: ['Haas', '#AEB3B7'],
+    audi: ['Audi', '#9E1B32'], sauber: ['Sauber', '#52E252'], cadillac: ['Cadillac', '#5C5F66'],
+    alphatauri: ['AlphaTauri', '#5E8FAA'], alfa: ['Alfa Romeo', '#B12039'],
+  };
+  const team = id => TEAMS[id] || [id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), '#8C8C8C'];
+  const pct = (x, d = 0) => x == null ? '–' : (x * 100).toFixed(d) + '%';
+  const short = n => n.replace(' Grand Prix', ' GP');
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  let DATA, current, timer;
+  const introTweens = [];
+
+  // ---------- tooltip ----------
+  const tip = $('#tip');
+  document.addEventListener('pointermove', e => {
+    const t = e.target.closest('[data-tip]');
+    if (!t) { tip.classList.remove('show'); return; }
+    tip.innerHTML = t.dataset.tip;
+    const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8);
+    tip.style.left = x + 'px'; tip.style.top = (e.clientY + 16) + 'px';
+    tip.classList.add('show');
+  });
+
+  // ---------- race selection ----------
+  function raceDate(r) { return new Date(r.date + 'T' + (r.time || '12:00:00Z')); }
+
+  function selectRace(round, opts = {}) {
+    const r = DATA.races.find(x => x.round === round);
+    if (!r) return;
+    current = r;
+    $('#race-select').value = String(round);
+    const idx = DATA.races.indexOf(r);
+    $('#prev').disabled = idx === 0;
+    $('#next').disabled = idx === DATA.races.length - 1;
+    try { history.replaceState(null, '', '#r' + round); } catch (e) {}
+    renderHero(r, opts.first);
+    renderTower(r, opts.first);
+    document.querySelectorAll('.rtile').forEach(t => t.classList.toggle('sel', +t.dataset.round === round));
+    const p = r.rows.slice(0, 3);
+    window.__f1race = { team: r.rows[0].team, color: team(r.rows[0].team)[1], podium: p.map(x => ({ code: x.code, color: team(x.team)[1] })) };
+    window.dispatchEvent(new CustomEvent('f1:race', { detail: window.__f1race }));
+  }
+
+  function renderHero(r, first) {
+    const up = r.status === 'upcoming';
+    const pill = $('#status-pill');
+    pill.className = 'pill ' + (up ? 'pill-live' : 'pill-done');
+    pill.textContent = up ? 'Next race' : 'Finished';
+    $('#race-round').textContent = `Round ${r.round} · ${DATA.season}`;
+    $('#race-name').textContent = r.name;
+    $('#race-circuit').textContent = `${r.circuit} · ${r.locality}, ${r.country}`;
+    const d = raceDate(r);
+    $('#race-when').textContent = 'Lights out ' + d.toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+
+    clearInterval(timer);
+    const cd = $('#countdown');
+    cd.hidden = !up || d < new Date();
+    if (!cd.hidden) {
+      const tick = () => {
+        let s = Math.max(0, Math.floor((d - new Date()) / 1000));
+        const parts = [Math.floor(s / 86400), Math.floor(s % 86400 / 3600), Math.floor(s % 3600 / 60), s % 60];
+        ['d', 'h', 'm', 's'].forEach((k, i) => $('#cd-' + k).textContent = String(parts[i]).padStart(2, '0'));
+      };
+      tick(); timer = setInterval(tick, 1000);
+    }
+
+    const w = r.rows[0];
+    const fav = r.rows.reduce((a, b) => (b.win > a.win ? b : a));
+    $('#w-code').innerHTML = `<span class="team-dot" style="--tc:${team(w.team)[1]}"></span>${esc(w.code)}`;
+    $('#w-name').textContent = `${w.name} · ${team(w.team)[0]}`;
+    $('#w-note').textContent = fav.driver !== w.driver
+      ? `Highest single win chance: ${fav.code} at ${pct(fav.win)}. The order also weighs consistency.`
+      : `Starts P${w.grid}${up && r.grid_source.startsWith('Estimated') ? ' (estimated)' : ''}. Podium chance ${pct(w.podium)}.`;
+    const verdict = $('#w-verdict');
+    if (up) verdict.innerHTML = '';
+    else {
+      const win = r.rows.find(x => x.actual === 1);
+      verdict.innerHTML = w.actual === 1
+        ? `<span class="verdict v-good">✓ Called it · ${esc(win.code)} won</span>`
+        : `<span class="verdict v-bad">✗ Missed · ${esc(win ? win.code : '?')} won, ${esc(w.code)} finished P${w.actual ?? '–'}</span>`;
+    }
+    $('#src-note').innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex:none;margin-top:3px"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7v4M8 4.6v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Grid: ${esc(r.grid_source)}. ${up ? 'Predicted with every race up to round ' + (r.round - 1) + '.' : 'Predicted before the race, using only earlier results.'}</span>`;
+
+    // win ring + count-up
+    const C = 263.9, target = w.win || 0;
+    const ring = $('#ring-val'), num = $('#ring-num');
+    if (G) {
+      const o = { v: 0 };
+      num.textContent = Math.round(target * 100) + '%';
+      introTweens.push(
+        G.fromTo(ring, { attr: { 'stroke-dashoffset': C } }, { attr: { 'stroke-dashoffset': C * (1 - target) }, duration: 1.1, ease: 'power3.out', delay: first ? .5 : 0 }),
+        G.to(o, { v: target * 100, duration: 1.1, ease: 'power3.out', delay: first ? .5 : 0, onUpdate: () => num.textContent = Math.round(o.v) + '%' }));
+      G.fromTo('#w-code', { scale: .6, rotate: -6 }, { scale: 1, rotate: 0, duration: .7, ease: 'back.out(2.2)' });
+    } else {
+      ring.setAttribute('stroke-dashoffset', C * (1 - target));
+      num.textContent = Math.round(target * 100) + '%';
+    }
+
+    // podium labels (P2 · P1 · P3, matching the 3D podium)
+    const order = [1, 0, 2].map(i => [i, r.rows[i]]);
+    $('#podium-labels').innerHTML = order.map(([i, x]) => `
+      <div class="pl clay-sm"><span class="p">P${i + 1}</span><span class="team-dot" style="--tc:${team(x.team)[1]}"></span>
+      <div><div class="c">${esc(x.code)}</div><div class="w">${pct(x.podium)} podium</div></div></div>`).join('');
+    if (G) introTweens.push(G.fromTo('.pl', { y: 30, scale: .9 }, { y: 0, scale: 1, duration: .6, stagger: .08, ease: 'back.out(2)' }));
+  }
+
+  function renderTower(r, first) {
+    const up = r.status === 'upcoming';
+    const est = r.grid_source.startsWith('Estimated');
+    $('#order-sub').textContent = up
+      ? `${short(r.name)}: every driver ranked by the model, with their chance of winning and of finishing on the podium.`
+      : `${short(r.name)}: what the model predicted before the race, next to the actual result.`;
+    $('#tower').innerHTML = r.rows.map(x => {
+      const [tn, tc] = team(x.team);
+      const mv = x.grid - x.pred;
+      const pl = n => n + (n === 1 ? " place" : " places");
+      const mvTxt = mv > 0 ? `▲ ${pl(mv)}` : mv < 0 ? `▼ ${pl(-mv)}` : "● holds";
+      const mvCls = mv > 0 ? 'up' : mv < 0 ? 'down' : 'same';
+      let act = up ? '<span class="act act-na">Not raced</span>' : '<span class="act act-na">–</span>';
+      if (x.actual != null) {
+        const d = Math.abs(x.actual - x.pred);
+        const cls = d <= 1 ? 'v-good' : d <= 3 ? 'v-warn' : 'v-bad';
+        const sym = d === 0 ? '✓' : d <= 1 ? '≈' : d <= 3 ? '~' : '✗';
+        act = `<span class="act ${cls}" data-tip="Finished P${x.actual}, predicted P${x.pred}">${sym} P${x.actual}</span>`;
+      }
+      return `<li class="trow${x.pred <= 3 ? ' top3' : ''}">
+        <span class="pos">P${x.pred}</span>
+        <span class="who"><span class="team-dot" style="--tc:${tc}"></span><span class="who-txt"><b>${esc(x.code)}</b><span class="nm">${esc(x.name)}</span><span class="tm">${esc(tn)}</span></span></span>
+        <span class="gridcell num">${est ? 'Est. ' : ''}P${x.grid}<span class="mv ${mvCls}">${mvTxt}</span></span>
+        <span class="barcell bc-w"><small><span class="mlabel">Win</span>${pct(x.win, 1)}</small><span class="bar inset" data-tip="${esc(x.code)} wins: ${pct(x.win, 1)}"><i style="--w:calc(${(x.win * 100).toFixed(2)}% - 6px)"></i></span></span>
+        <span class="barcell bc-p"><small><span class="mlabel">Podium</span>${pct(x.podium, 1)}</small><span class="bar inset pod" data-tip="${esc(x.code)} on the podium: ${pct(x.podium, 1)}"><i style="--w:calc(${(x.podium * 100).toFixed(2)}% - 6px)"></i></span></span>
+        ${act}
+      </li>`;
+    }).join('');
+    if (G && !first) {
+      G.fromTo('#tower .trow', { x: -40, opacity: .2 }, { x: 0, opacity: 1, duration: .5, stagger: .025, ease: 'power3.out' });
+      G.fromTo('#tower .bar i', { scaleX: .1 }, { scaleX: 1, duration: .8, stagger: .012, ease: 'power3.out', delay: .15 });
+    }
+  }
+
+  // ---------- season ----------
+  function renderSeason() {
+    const t = DATA.season_track, n = t.length;
+    $('#season-year').textContent = DATA.season;
+    const mw = t.filter(x => x.model_winner).length, gw = t.filter(x => x.grid_winner).length;
+    const mp = t.reduce((a, x) => a + x.model_podium, 0), gp = t.reduce((a, x) => a + x.grid_podium, 0);
+    const exact = DATA.races.filter(r => r.status === 'completed').reduce((a, r) => a + r.rows.filter(x => x.actual === x.pred).length, 0);
+    const total = DATA.races.filter(r => r.status === 'completed').reduce((a, r) => a + r.rows.length, 0);
+    $('#stats').innerHTML = `
+      <div class="stat clay"><span class="eyebrow">Winners called</span><span class="big num">${mw}<small> / ${n}</small></span><span class="vs">Grid order: ${gw} / ${n}</span></div>
+      <div class="stat clay"><span class="eyebrow">Podium drivers named</span><span class="big num">${mp}<small> / ${n * 3}</small></span><span class="vs">Grid order: ${gp} / ${n * 3}</span></div>
+      <div class="stat clay"><span class="eyebrow">Exact positions</span><span class="big num">${exact}<small> / ${total}</small></span><span class="vs">Drivers placed in exactly the predicted spot</span></div>`;
+    const tiles = t.map(x => `
+      <button class="rtile clay-sm" data-round="${x.round}" aria-label="Round ${x.round} ${esc(x.name)}">
+        <span class="rt-top"><span class="rn">R${x.round}</span>${x.model_winner ? '<span class="verdict v-good" style="margin:0">✓ Winner</span>' : '<span class="verdict v-bad" style="margin:0">✗ Winner</span>'}</span>
+        <span class="rname">${esc(short(x.name))}</span>
+        <span class="rwin"><span class="team-dot" style="--tc:${team(x.winner_team)[1]}"></span>${esc(x.winner)} won</span>
+        <span class="dots" data-tip="${x.model_podium} of 3 podium drivers named">${[0, 1, 2].map(i => `<i class="${i < x.model_podium ? 'on' : ''}"></i>`).join('')}<span>${x.model_podium}/3 podium</span></span>
+      </button>`);
+    const nx = DATA.races.find(r => r.status === 'upcoming');
+    if (nx) tiles.push(`
+      <button class="rtile clay-sm next" data-round="${nx.round}">
+        <span class="rt-top"><span class="rn">R${nx.round}</span><span class="rn">Next</span></span>
+        <span class="rname">${esc(short(nx.name))}</span>
+        <span class="rwin"><span class="team-dot" style="--tc:${team(nx.rows[0].team)[1]}"></span>${esc(nx.rows[0].code)} tipped</span>
+        <span class="dots muted">${pct(nx.rows[0].win)} win chance</span>
+      </button>`);
+    DATA.calendar.forEach(c => tiles.push(`
+      <div class="rtile clay-sm future" aria-label="Round ${c.round} ${esc(c.name)}, not predicted yet">
+        <span class="rt-top"><span class="rn">R${c.round}</span><span class="rn">${new Date(c.date + 'T12:00:00Z').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span></span>
+        <span class="rname">${esc(short(c.name))}</span>
+        <span class="dots">Prediction after previous race</span>
+      </div>`));
+    $('#rounds').innerHTML = tiles.join('');
+    $('#rounds').addEventListener('click', e => {
+      const b = e.target.closest('button.rtile');
+      if (!b) return;
+      selectRace(+b.dataset.round);
+      document.getElementById('race').scrollIntoView({ behavior: RM ? 'auto' : 'smooth' });
+    });
+  }
+
+  // ---------- accuracy charts ----------
+  const METRICS = [
+    { key: 'winner_correct', label: 'Winner correct', fmt: v => pct(v), max: 1, cap: 'Share of races where the top pick won. Higher is better.' },
+    { key: 'podium_overlap', label: 'Podium drivers', fmt: v => pct(v), max: 1, cap: 'Share of the three podium finishers the prediction named. Higher is better.' },
+    { key: 'mae_pos', label: 'Position error', fmt: v => v.toFixed(2), max: 4, cap: 'Average places between predicted and actual finish. Lower is better.' },
+  ];
+  let metric = METRICS[0];
+
+  function renderSeasonChart(animate) {
+    const S = DATA.backtest.seasons, years = Object.keys(S);
+    const W = 560, H = 290, m = { l: 44, r: 10, t: 26, b: 34 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const y = v => m.t + ih - (v / metric.max) * ih;
+    const gw = iw / years.length, bw = Math.min(56, gw * .3);
+    const ticks = metric.max === 1 ? [0, .25, .5, .75, 1] : [0, 1, 2, 3, 4];
+    const bar = (x, v, cls, color, who, yr) => {
+      const top = y(v), h = m.t + ih - top, r = Math.min(6, h);
+      const d = `M${x},${m.t + ih} V${top + r} Q${x},${top} ${x + r},${top} H${x + bw - r} Q${x + bw},${top} ${x + bw},${top + r} V${m.t + ih} Z`;
+      return `<path class="sbar" d="${d}" fill="${color}" data-tip="${yr} · ${who}: ${metric.fmt(v)}"/>
+        <text class="val-label" x="${x + bw / 2}" y="${top - 7}" text-anchor="middle">${metric.fmt(v)}</text>`;
+    };
+    let g = ticks.map(t => `<line class="gridl" x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}"/><text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${metric.max === 1 ? Math.round(t * 100) + '%' : t}</text>`).join('');
+    years.forEach((yr, i) => {
+      const cx = m.l + gw * i + gw / 2;
+      g += bar(cx - bw - 1, S[yr].model[metric.key], 'a', 'var(--series-a)', 'Model', yr);
+      g += bar(cx + 1, S[yr].grid[metric.key], 'b', 'var(--series-b)', 'Grid order', yr);
+      g += `<text x="${cx}" y="${H - 10}" text-anchor="middle" style="fill:var(--ink)">${yr}${+yr === DATA.season ? ' (so far)' : ''}</text>`;
+    });
+    g += `<line class="axis" x1="${m.l}" x2="${W - m.r}" y1="${m.t + ih}" y2="${m.t + ih}"/>`;
+    $('#season-chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${metric.label} by season, model versus grid order">${g}</svg>`;
+    $('#metric-cap').textContent = metric.cap;
+    $('#season-tbl').innerHTML = `<table><thead><tr><th>Season</th><th>Races</th>${METRICS.map(mm => `<th>${mm.label}<br>model / grid</th>`).join('')}</tr></thead><tbody>${years.map(yr => `<tr><td>${yr}</td><td>${S[yr].races}</td>${METRICS.map(mm => `<td>${mm.fmt(S[yr].model[mm.key])} / ${mm.fmt(S[yr].grid[mm.key])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    if (G && animate) G.fromTo('#season-chart .sbar', { scaleY: 0, transformOrigin: '50% 100%' }, { scaleY: 1, duration: .8, stagger: .06, ease: 'back.out(1.4)' });
+  }
+
+  function renderMetricTabs() {
+    $('#metric-tabs').innerHTML = METRICS.map((mm, i) => `<button class="clay-btn" aria-pressed="${i === 0}" data-i="${i}">${mm.label}</button>`).join('');
+    $('#metric-tabs').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      metric = METRICS[+b.dataset.i];
+      $('#metric-tabs').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+      renderSeasonChart(true);
+    });
+    $('#tbl-btn').addEventListener('click', e => {
+      const t = $('#season-tbl'); t.hidden = !t.hidden;
+      e.currentTarget.setAttribute('aria-expanded', !t.hidden);
+      e.currentTarget.textContent = t.hidden ? 'Show as table' : 'Hide table';
+    });
+  }
+
+  function renderCalibration() {
+    const C = DATA.backtest.calibration;
+    const W = 360, H = 270, m = { l: 44, r: 14, t: 14, b: 40 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const x = v => m.l + v * iw, y = v => m.t + ih - v * ih;
+    let g = [0, .25, .5, .75, 1].map(t => `<line class="gridl" x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}"/><text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${t * 100}%</text><text x="${x(t)}" y="${m.t + ih + 18}" text-anchor="middle">${t * 100}%</text>`).join('');
+    g += `<line x1="${x(0)}" y1="${y(0)}" x2="${x(1)}" y2="${y(1)}" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="5 5"/>`;
+    g += `<text x="${x(.66)}" y="${y(.6) + 16}" transform="rotate(-37 ${x(.66)} ${y(.6) + 16})" style="font-size:11px">Perfectly honest odds</text>`;
+    g += C.map(c => `<g class="cdot" data-tip="Predicted ${c.bin}: average ${pct(c.predicted)} → actually won ${pct(c.actual)} (${c.n} drivers)">
+        <circle cx="${x(c.predicted)}" cy="${y(c.actual)}" r="14" fill="transparent"/>
+        <circle cx="${x(c.predicted)}" cy="${y(c.actual)}" r="${c.n < 5 ? 5 : 7}" fill="var(--series-a)" stroke="var(--surface)" stroke-width="2" ${c.n < 5 ? 'fill-opacity=".45"' : ''}/></g>`).join('');
+    g += `<text x="${m.l + iw / 2}" y="${H - 4}" text-anchor="middle">Predicted win chance</text>`;
+    g += `<text transform="translate(12 ${m.t + ih / 2}) rotate(-90)" text-anchor="middle">Actually won</text>`;
+    $('#calib').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Calibration of win probabilities">${g}</svg><p class="cap" style="font-size:.8rem;margin-top:6px">Faded dot: under 5 drivers in that group, too few to judge.</p>`;
+  }
+
+  function renderImportance() {
+    const I = DATA.backtest.importance, max = I[0].value;
+    $('#imp').innerHTML = I.map(f => `<div class="imp-row"><span>${esc(f.label)}</span><span class="bar inset" data-tip="${esc(f.label)}: ${pct(f.value, 1)}"><i style="--w:calc(${(f.value / max * 100).toFixed(1)}% - 6px)"></i></span><span class="v">${pct(f.value, 1)}</span></div>`).join('');
+  }
+
+  // ---------- motion ----------
+  function intro() {
+    if (!G) return;
+    const tl = G.timeline({ defaults: { ease: 'power3.out' } });
+    tl.from('.topbar', { y: -70, duration: .6 })
+      .from('.race-card', { y: 40, scale: .96, duration: .8, ease: 'back.out(1.5)' }, '-=.3')
+      .from('.stage', { y: 40, scale: .96, duration: .8, ease: 'back.out(1.5)' }, '<.1')
+      .from('.race-card > *', { y: 18, duration: .5, stagger: .07 }, '<.2')
+      .from('#tower .trow', { x: -30, duration: .45, stagger: .03 }, '-=.2')
+      .from('#tower .bar i', { scaleX: .15, duration: .8, stagger: .01 }, '<.2');
+    introTweens.push(tl);
+    // If the browser throttles animation frames (background tab, link previews), finish the intro anyway.
+    setTimeout(() => introTweens.forEach(t => t.progress(1)), 2800);
+
+    if (!window.ScrollTrigger) return;
+    // Scroll reveals keep content visible: they only move and grow, never start hidden.
+    G.utils.toArray('.sec-head, .stat, .rtile, .panel, .step, .fine').forEach(el => {
+      G.from(el, { y: 50, scale: .95, rotate: el.classList.contains('rtile') ? -2 : 0, duration: .8, ease: 'back.out(1.6)', immediateRender: false,
+        scrollTrigger: { trigger: el, start: 'top bottom', once: true } });
+    });
+    ScrollTrigger.create({ trigger: '#season-chart', start: 'top bottom', once: true, onEnter: () => renderSeasonChart(true) });
+    G.from('#imp .bar i', { scaleX: 0, duration: 1, stagger: .06, ease: 'power3.out', immediateRender: false, scrollTrigger: { trigger: '#imp', start: 'top bottom', once: true } });
+    G.from('.cdot circle:last-child', { scale: 0, transformOrigin: '50% 50%', duration: .6, stagger: .1, ease: 'back.out(3)', immediateRender: false, scrollTrigger: { trigger: '#calib', start: 'top bottom', once: true } });
+    G.from('.step .n', { rotate: -180, scale: .3, duration: .9, stagger: .12, ease: 'back.out(2)', immediateRender: false, scrollTrigger: { trigger: '.steps', start: 'top bottom', once: true } });
+  }
+
+  // ---------- boot ----------
+  fetch('data.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(d => {
+    DATA = d;
+    const sel = $('#race-select');
+    sel.innerHTML = d.races.map(r => `<option value="${r.round}">R${r.round} · ${esc(short(r.name))}${r.status === 'upcoming' ? '  (next)' : ''}</option>`).join('');
+    sel.addEventListener('change', () => selectRace(+sel.value));
+    $('#prev').addEventListener('click', () => { const i = d.races.indexOf(current); if (i > 0) selectRace(d.races[i - 1].round); });
+    $('#next').addEventListener('click', () => { const i = d.races.indexOf(current); if (i < d.races.length - 1) selectRace(d.races[i + 1].round); });
+    renderSeason(); renderMetricTabs(); renderSeasonChart(false); renderCalibration(); renderImportance();
+    const fromHash = /^#r(\d+)$/.exec(location.hash);
+    const start = (fromHash && d.races.find(r => r.round === +fromHash[1])) || d.races.find(r => r.status === 'upcoming') || d.races[d.races.length - 1];
+    selectRace(start.round, { first: true });
+    $('#updated').textContent = 'Model updated ' + new Date(d.generated_at).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    intro();
+  }).catch(err => {
+    $('#tower').innerHTML = `<li class="loading">Couldn't load predictions (${esc(err.message)}). Reload the page to try again.</li>`;
+    $('#race-name').textContent = 'Predictions unavailable';
+  });
+})();
+</script>
+
+<!-- 3D stage: clay F1 car + predicted podium on a turntable -->
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const G = window.gsap && !RM ? window.gsap : null;
+const canvas = document.getElementById('scene');
+const stage = document.getElementById('stage');
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+} catch (e) {
+  canvas.remove();
+  stage.insertAdjacentHTML('afterbegin', '<div class="stage-fallback">3D view needs WebGL, which this browser has turned off.</div>');
+  throw e;
+}
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
+camera.position.set(8.5, 5.2, 9.5);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 0.6, -0.4);
+controls.enableZoom = false;
+controls.enablePan = false;
+controls.enableDamping = true;
+controls.autoRotate = !RM;
+controls.autoRotateSpeed = 0.9;
+controls.minPolarAngle = 0.6;
+controls.maxPolarAngle = 1.35;
+
+// Soft clay lighting
+scene.add(new THREE.HemisphereLight(0xfff4ee, 0x9a8580, 1.5));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+sun.position.set(5, 10, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = sun.shadow.camera.bottom = -7;
+sun.shadow.camera.right = sun.shadow.camera.top = 7;
+sun.shadow.radius = 6;
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+const rim = new THREE.DirectionalLight(0xffd8cc, 0.8);
+rim.position.set(-6, 4, -6);
+scene.add(rim);
+
+const clay = (color, extra = {}) => new THREE.MeshPhysicalMaterial({ color, roughness: 0.82, metalness: 0, sheen: 0.6, sheenRoughness: 0.8, sheenColor: new THREE.Color(0xffffff), ...extra });
+const rbox = (w, h, d, r, mat) => { const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 5, r), mat); m.castShadow = m.receiveShadow = true; return m; };
+const mesh = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; return m; };
+
+// ---------- turntable ----------
+const world = new THREE.Group();
+scene.add(world);
+const ttMat = clay(0xddd3cf);
+const table = mesh(new THREE.CylinderGeometry(4.6, 4.75, 0.4, 96), ttMat);
+table.position.y = -0.2;
+world.add(table);
+const kerbRed = clay(0xd7261e), kerbWhite = clay(0xf7f2ef);
+const KERBS = 48;
+for (let i = 0; i < KERBS; i++) {
+  const a = (i / KERBS) * Math.PI * 2;
+  const k = rbox(0.6, 0.14, 0.34, 0.05, i % 2 ? kerbWhite : kerbRed);
+  k.position.set(Math.cos(a) * 4.42, 0.04, Math.sin(a) * 4.42);
+  k.rotation.y = -a + Math.PI / 2;
+  world.add(k);
+}
+
+// ---------- car (nose points +x) ----------
+const car = new THREE.Group();
+const body = clay(0xd7261e);
+const trim = clay(0x2a2326);
+const white = clay(0xf4efec);
+const tyre = clay(0x2b2729, { roughness: 0.95, sheen: 0.3 });
+const yellow = clay(0xf2c230);
+
+const plank = rbox(4.3, 0.1, 1.2, 0.04, trim); plank.position.set(-0.1, 0.24, 0); car.add(plank);
+const tub = rbox(2.9, 0.46, 0.66, 0.2, body); tub.position.set(0.25, 0.53, 0); car.add(tub);
+const nose = mesh(new THREE.CylinderGeometry(0.09, 0.26, 1.55, 24), body);
+nose.rotation.z = -Math.PI / 2; nose.scale.set(1, 1, 0.65); nose.position.set(2.35, 0.43, 0); car.add(nose);
+for (const [x, y, d] of [[3.05, 0.2, 0.42], [2.8, 0.3, 0.3]]) {
+  const fw = rbox(d, 0.06, 2.2, 0.025, x > 3 ? body : white); fw.position.set(x, y, 0); car.add(fw);
+}
+for (const z of [-1.1, 1.1]) { const ep = rbox(0.62, 0.3, 0.05, 0.02, trim); ep.position.set(2.95, 0.32, z); car.add(ep); }
+for (const z of [-0.56, 0.56]) { const sp = rbox(1.7, 0.44, 0.46, 0.2, body); sp.position.set(-0.15, 0.48, z); car.add(sp); }
+const cover = rbox(1.9, 0.5, 0.52, 0.24, body); cover.position.set(-0.9, 0.78, 0); car.add(cover);
+const airbox = rbox(0.45, 0.42, 0.38, 0.16, trim); airbox.position.set(-0.05, 1.05, 0); car.add(airbox);
+const fin = rbox(1.25, 0.32, 0.04, 0.02, body); fin.position.set(-1.35, 1.06, 0); car.add(fin);
+const helmet = mesh(new THREE.SphereGeometry(0.21, 32, 24), white); helmet.position.set(0.55, 0.9, 0); car.add(helmet);
+const visor = mesh(new THREE.SphereGeometry(0.215, 32, 16, -0.9, 1.8, 1.15, 0.5), trim); visor.position.copy(helmet.position); car.add(visor);
+const halo = mesh(new THREE.TorusGeometry(0.34, 0.045, 12, 40, Math.PI), trim);
+halo.rotation.set(-Math.PI / 2, 0, -Math.PI / 2); halo.position.set(0.62, 1.08, 0); car.add(halo);
+const pillar = mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.3, 12), trim); pillar.position.set(0.96, 0.95, 0); pillar.rotation.z = 0.35; car.add(pillar);
+// rear wing
+for (const [y, d, m] of [[1.2, 0.5, body], [1.36, 0.32, white]]) { const rw = rbox(d, 0.08, 1.3, 0.03, m); rw.position.set(-2.2, y, 0); car.add(rw); }
+for (const z of [-0.66, 0.66]) { const ep = rbox(0.7, 0.72, 0.05, 0.02, trim); ep.position.set(-2.2, 1.0, z); car.add(ep); }
+const pylon = rbox(0.12, 0.6, 0.08, 0.03, trim); pylon.position.set(-2.05, 0.82, 0); car.add(pylon);
+const gearbox = rbox(0.8, 0.32, 0.4, 0.12, trim); gearbox.position.set(-1.95, 0.45, 0); car.add(gearbox);
+// wheels
+const wheels = [];
+for (const [x, r, w] of [[1.6, 0.42, 0.38], [-1.65, 0.46, 0.48]]) {
+  for (const z of [-0.98, 0.98]) {
+    const wg = new THREE.Group();
+    const t = mesh(new THREE.CylinderGeometry(r, r, w, 40), tyre); t.rotation.x = Math.PI / 2; wg.add(t);
+    const band = mesh(new THREE.TorusGeometry(r * 0.72, 0.03, 8, 40), yellow); band.position.z = Math.sign(z) * (w / 2 + 0.005); wg.add(band);
+    const hub = mesh(new THREE.CylinderGeometry(r * 0.38, r * 0.38, w + 0.04, 24), body); hub.rotation.x = Math.PI / 2; wg.add(hub);
+    wg.position.set(x, r, z);
+    car.add(wg); wheels.push(wg);
+    // suspension arms
+    for (const dy of [-0.06, 0.1]) {
+      const arm = mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.7, 8), trim);
+      arm.rotation.x = Math.PI / 2; arm.position.set(x, r + dy, z * 0.62); car.add(arm);
+    }
+  }
+}
+car.position.set(0, 0, 1.25);
+car.rotation.y = -0.35;
+world.add(car);
+
+// ---------- podium ----------
+const podium = new THREE.Group();
+const podMat = clay(0xf4efec);
+const numberTex = n => {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#d7261e'; g.font = '800 170px Unbounded, "Arial Rounded MT Bold", sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(n), 128, 140);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+};
+const helmets = [];
+[[2, -1.35, 1.0], [1, 0, 1.45], [3, 1.35, 0.72]].forEach(([n, x, h]) => {
+  const block = rbox(1.25, h, 1.1, 0.16, podMat);
+  block.position.set(x, h / 2, 0); podium.add(block);
+  const label = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshBasicMaterial({ map: numberTex(n), transparent: true, toneMapped: false }));
+  label.position.set(x, h * 0.52, 0.56); podium.add(label);
+  const hg = new THREE.Group();
+  const shell = mesh(new THREE.SphereGeometry(0.34, 32, 24), clay(0xffffff)); hg.add(shell);
+  const v = mesh(new THREE.SphereGeometry(0.345, 32, 16, -0.95, 1.9, 1.1, 0.55), trim); v.rotation.y = Math.PI / 2; hg.add(v);
+  const chin = rbox(0.42, 0.12, 0.5, 0.05, trim); chin.position.set(0, -0.27, 0.05); hg.add(chin);
+  hg.position.set(x, h + 0.4, 0); hg.userData = { base: h + 0.4, shell, phase: n };
+  podium.add(hg); helmets[n - 1] = hg;
+});
+podium.position.set(0, 0, -2.3);
+world.add(podium);
+
+// ---------- theme-aware turntable ----------
+function syncTheme() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--tt').trim();
+  if (v) ttMat.color.set(v);
+}
+syncTheme();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncTheme);
+new MutationObserver(syncTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// ---------- react to race changes ----------
+function tweenColor(mat, hex) {
+  const to = new THREE.Color(hex);
+  if (!G) { mat.color.copy(to); return; }
+  G.to(mat.color, { r: to.r, g: to.g, b: to.b, duration: 0.8, ease: 'power2.inOut' });
+}
+let spin = 0;
+function applyRace(d) {
+  if (!d) return;
+  tweenColor(body, d.color);
+  d.podium.forEach((p, i) => helmets[i] && tweenColor(helmets[i].userData.shell.material, p.color));
+  if (G) {
+    spin += Math.PI * 2;
+    G.to(car.rotation, { y: -0.35 + spin, duration: 1.4, ease: 'power3.inOut' });
+    G.fromTo(car.position, { y: 0 }, { y: 0.5, duration: 0.35, yoyo: true, repeat: 1, ease: 'power2.out' });
+    helmets.forEach((h, i) => G.fromTo(h.position, { y: h.userData.base + 2.2 }, { y: h.userData.base, duration: 1.1, delay: 0.15 + i * 0.12, ease: 'bounce.out' }));
+  }
+}
+window.addEventListener('f1:race', e => applyRace(e.detail));
+applyRace(window.__f1race);
+
+// ---------- size + loop ----------
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.position.setLength(w < 560 ? 19 : w < 760 ? 17 : 15.5);
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+let visible = true;
+new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(stage);
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta(), t = clock.elapsedTime;
+  if (!visible) return;
+  if (!RM) {
+    wheels.forEach(w => (w.rotation.z -= dt * 3));
+    tub.position.y = 0.53 + Math.sin(t * 3) * 0.008;
+    helmets.forEach(h => { if (!G || !G.isTweening(h.position)) h.position.y = h.userData.base + Math.sin(t * 2 + h.userData.phase) * 0.05; h.rotation.y = Math.sin(t * 0.8 + h.userData.phase) * 0.35; });
+  }
+  controls.update();
+  renderer.render(scene, camera);
+});
+if (G) {
+  const pop = G.from(world.scale, { x: 0.01, y: 0.01, z: 0.01, duration: 1.3, ease: 'elastic.out(1, 0.6)', delay: 0.3 });
+  setTimeout(() => pop.progress(1), 2800);
+}
+</script>
