@@ -75,6 +75,8 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
 html { scroll-behavior: smooth; }
 body {
   background: var(--bg);
@@ -491,6 +493,8 @@ footer a { color: inherit; }
   const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const G = window.gsap && !RM ? window.gsap : null;
   if (G && window.ScrollTrigger) G.registerPlugin(ScrollTrigger);
+  // Keep animations on real time: when frames arrive late (slow device, background tab), jump ahead instead of crawling.
+  if (window.gsap) gsap.ticker.lagSmoothing(0);
 
   const TEAMS = {
     mercedes: ['Mercedes', '#19C3AC'], ferrari: ['Ferrari', '#E8002D'], mclaren: ['McLaren', '#FF8000'],
