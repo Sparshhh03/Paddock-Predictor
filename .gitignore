@@ -6,3 +6,6 @@ venv/
 .claude/
 .DS_Store
 Thumbs.db
+
+# Private notes for Claude Code sessions (kept local, never uploaded)
+CLAUDE.md
